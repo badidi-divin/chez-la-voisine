@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traiteur - Cuisine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f7f9fb; }
+        .card-panel { border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
+        .tab-link.active { background: #212529; color: #fff !important; }
+        .status-badge { min-width: 115px; }
+        .btn-status { min-width: 140px; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark bg-dark sticky-top px-4 py-3">
+    <div class="d-flex align-items-center gap-3">
+        <span class="navbar-brand mb-0 h5 text-white">
+            <i class="fa-solid fa-fire-burner me-2 text-warning"></i>Traiteur
+        </span>
+        <a href="{% url 'page_traiteur' %}" class="btn btn-outline-light btn-sm {% if active_tab == 'statistiques' %}active{% endif %} tab-link">
+            Statistiques
+        </a>
+        <a href="{% url 'page_traiteur_commandes' %}" class="btn btn-outline-light btn-sm {% if active_tab == 'commandes' %}active{% endif %} tab-link">
+            Commandes
+        </a>
+        <a href="{% url 'page_traiteur_historique' %}" class="btn btn-outline-light btn-sm {% if active_tab == 'historique' %}active{% endif %} tab-link">
+            Historique
+        </a>
+    </div>
+    <div class="ms-auto">
+        <a href="{% url 'deconnexion_portail' %}" class="btn btn-outline-danger btn-sm">
+            <i class="fa-solid fa-sign-out-alt"></i>
+        </a>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <div class="mb-4">
+        <h4 class="fw-bold">Bonjour, {{ user.username|capfirst }} !</h4>
+        <p class="text-muted">Gestion des commandes à préparer et suivi du service.</p>
+    </div>
+
+    {% if active_tab == 'statistiques' %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card card-panel p-4 text-center">
+                <div class="text-secondary mb-2"><i class="fa-solid fa-receipt fa-lg"></i></div>
+                <div class="text-muted small">Commandes du jour</div>
+                <div class="fs-3 fw-bold">{{ total_commandes }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-panel p-4 text-center">
+                <div class="text-warning mb-2"><i class="fa-solid fa-clock"></i></div>
+                <div class="text-muted small">En attente</div>
+                <div class="fs-3 fw-bold">{{ commandes_en_attente }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-panel p-4 text-center">
+                <div class="text-info mb-2"><i class="fa-solid fa-kitchen-set"></i></div>
+                <div class="text-muted small">En préparation</div>
+                <div class="fs-3 fw-bold">{{ commandes_en_preparation }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-panel p-4 text-center">
+                <div class="text-success mb-2"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="text-muted small">Prêtes</div>
+                <div class="fs-3 fw-bold">{{ commandes_pret }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="card card-panel p-4 mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h6 class="mb-1">Chiffre d'affaires des commandes payées</h6>
+                <p class="text-muted mb-0">Montant cumulé aujourd'hui.</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <span class="fs-3 fw-bold">{{ chiffre_affaires }} FC</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if active_tab == 'commandes' %}
+    <div class="card card-panel mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Commandes en cours</h5>
+            {% if commandes %}
+                <div class="list-group">
+                    {% for commande in commandes %}
+                    <div class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+                        <div>
+                            <div class="fw-bold">Table {{ commande.table }}</div>
+                            <div class="text-muted small">Créée le {{ commande.date_creation|date:'d/m/Y H:i' }}</div>
+                            <div class="text-muted small">Serveur : {% if commande.serveur %}{{ commande.serveur.username }}{% else %}—{% endif %}</div>
+                        </div>
+                        <div class="text-md-end">
+                            <span class="badge status-badge {% if commande.statut == 'EN_ATTENTE' %}bg-warning text-dark{% elif commande.statut == 'EN_PREPARATION' %}bg-info text-dark{% else %}bg-success text-white{% endif %} rounded-pill">{{ commande.get_statut_display }}</span>
+                            <div class="fw-bold mt-2">{{ commande.total_montant }} FC</div>
+                        </div>
+                        <div class="d-flex gap-2 mt-2 mt-md-0">
+                            {% if commande.statut == 'EN_ATTENTE' %}
+                            <button class="btn btn-outline-primary btn-status" data-id="{{ commande.pk }}" data-status="EN_PREPARATION">En préparation</button>
+                            {% elif commande.statut == 'EN_PREPARATION' %}
+                            <button class="btn btn-outline-success btn-status" data-id="{{ commande.pk }}" data-status="PRET">Marquer prête</button>
+                            {% else %}
+                            <button class="btn btn-secondary btn-status" disabled>En attente de paiement</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted">Aucune commande active pour le moment.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if active_tab == 'historique' %}
+    <div class="card card-panel mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Historique des commandes</h5>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Table</th>
+                            <th>Serveur</th>
+                            <th>Statut</th>
+                            <th>Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for commande in commandes_historique %}
+                        <tr>
+                            <td>{{ commande.date_creation|date:'d/m/Y H:i' }}</td>
+                            <td>{{ commande.table }}</td>
+                            <td>{% if commande.serveur %}{{ commande.serveur.username }}{% else %}—{% endif %}</td>
+                            <td><span class="badge {% if commande.statut == 'PAYEE' %}bg-success{% elif commande.statut == 'EN_PREPARATION' %}bg-info text-dark{% elif commande.statut == 'PRET' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ commande.get_statut_display }}</span></td>
+                            <td>{{ commande.total_montant }} FC</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">Aucune commande historique.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('click', function(event) {
+        const button = event.target.closest('.btn-status');
+        if (!button) return;
+
+        const commandeId = button.dataset.id;
+        const statut = button.dataset.status;
+        if (!commandeId || !statut) return;
+
+        fetch(`{% url 'changer_statut_commande' pk=0 %}`.replace('/0/', `/${commandeId}/`), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ statut }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error || 'Impossible de changer le statut.');
+            }
+        });
+    });
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+</script>
+</body>
+</html>
