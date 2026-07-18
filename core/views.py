@@ -3,9 +3,11 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+from django.utils.dateparse import parse_date
+from django.db.models import Sum, F, ExpressionWrapper, DecimalField, Count
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 
 from .models import Categorie, Produit, Commande, LigneCommande, ReservationStock
@@ -47,7 +49,7 @@ def rediriger_selon_role(user):
     vers son espace de travail selon ses groupes Django.
     """
     if user.is_superuser:
-        return redirect('/admin/')  # Les administrateurs généraux vont sur l'admin Django
+        return redirect('page_admin')
         
     def groupe_present(prefix):
         return user.groups.filter(name__istartswith=prefix).exists()
@@ -80,6 +82,10 @@ def is_serveur(user):
 
 def is_caissier(user):
     return user.groups.filter(name__istartswith='caissier').exists()
+
+
+def is_administrateur(user):
+    return user.is_superuser
 
 
 # ==========================================================
@@ -428,10 +434,75 @@ def valider_paiement_commande(request, pk):
         return JsonResponse({'success': False, 'error': 'La commande doit être prête pour validation.'})
 
     commande.statut = action
-    commande.caissier = request.user
+    if action == 'PAYEE':
+        commande.caissier = request.user
     commande.save(update_fields=['statut', 'caissier', 'date_modification'])
 
     return JsonResponse({'success': True, 'statut': commande.statut})
+
+
+@login_required(login_url='connexion_unique')
+def recu_paiement_commande(request, pk):
+    if not is_caissier(request.user):
+        return redirect('deconnexion_portail')
+
+    commande = get_object_or_404(Commande, pk=pk)
+    return render(request, 'caissier/recu_paiement.html', {
+        'commande': commande,
+        'server_name': commande.serveur.username if commande.serveur else '—',
+    })
+
+
+@login_required(login_url='connexion_unique')
+def page_admin(request):
+    if not is_administrateur(request.user):
+        return redirect('deconnexion_portail')
+
+    orders = Commande.objects.select_related('serveur', 'caissier', 'traiteur').all()
+    start_date_value = request.GET.get('start_date')
+    end_date_value = request.GET.get('end_date')
+    start_date = parse_date(start_date_value) if start_date_value else None
+    end_date = parse_date(end_date_value) if end_date_value else None
+    statut = request.GET.get('statut')
+    serveur = request.GET.get('serveur')
+    caissier = request.GET.get('caissier')
+
+    if start_date:
+        orders = orders.filter(date_creation__date__gte=start_date)
+    if end_date:
+        orders = orders.filter(date_creation__date__lte=end_date)
+    if statut:
+        orders = orders.filter(statut=statut)
+    if serveur:
+        orders = orders.filter(serveur__username=serveur)
+    if caissier:
+        orders = orders.filter(caissier__username=caissier)
+
+    total_orders = orders.count()
+    total_revenue = orders.filter(statut='PAYEE').aggregate(total=Sum('total_montant'))['total'] or 0
+    status_counts = orders.values('statut').annotate(count=Count('id')).order_by('statut')
+    commandes_globales = orders.order_by('-date_creation')[:200]
+
+    serveurs = User.objects.filter(groups__name__iexact='Serveur').order_by('username').distinct()
+    caissiers = User.objects.filter(groups__name__iexact='Caissier').order_by('username').distinct()
+
+    context = {
+        'total_orders': total_orders,
+        'total_revenue': total_revenue,
+        'status_counts': status_counts,
+        'commandes_globales': commandes_globales,
+        'status_choices': Commande.STATUT_CHOICES,
+        'serveurs': serveurs,
+        'caissiers': caissiers,
+        'filters': {
+            'start_date': request.GET.get('start_date', ''),
+            'end_date': request.GET.get('end_date', ''),
+            'statut': statut or '',
+            'serveur': serveur or '',
+            'caissier': caissier or '',
+        }
+    }
+    return render(request, 'admin/dashboard.html', context)
 
 
 @login_required(login_url='connexion_unique')

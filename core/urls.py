@@ -26,4 +26,5 @@ urlpatterns = [
     path('caissier/', views.page_caissier, name='page_caissier'),
     path('caissier/historique/', views.page_caissier_historique, name='page_caissier_historique'),
     path('caissier/commande/<int:pk>/paiement/', views.valider_paiement_commande, name='valider_paiement_commande'),
+    path('caissier/commande/<int:pk>/recu/', views.recu_paiement_commande, name='recu_paiement_commande'),
 ]

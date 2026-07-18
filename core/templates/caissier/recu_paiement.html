@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reçu de paiement - Chez la voisine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; padding: 24px; }
+        .ticket { max-width: 680px; margin: auto; background: #fff; padding: 32px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08); }
+        .ticket-header { text-align: center; margin-bottom: 28px; }
+        .ticket-header h1 { margin-bottom: 0.25rem; font-size: 1.9rem; letter-spacing: 1px; }
+        .ticket-header p { margin-bottom: 0; color: #6c757d; }
+        .line-item { border-bottom: 1px solid #eee; padding: 12px 0; }
+        .line-item:last-child { border-bottom: none; }
+        .total-row { font-size: 1.15rem; font-weight: 700; }
+        .print-btn { margin-top: 24px; }
+    </style>
+</head>
+<body>
+<div class="ticket">
+    <div class="ticket-header">
+        <h1>Chez la voisine</h1>
+        <p>Reçu de paiement officiel</p>
+        <small class="text-muted">Serveur : {{ server_name }}</small>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <strong>Commande</strong><br>
+            #{{ commande.id }}
+        </div>
+        <div class="col-md-6 text-md-end">
+            <strong>Date</strong><br>
+            {{ commande.date_creation|date:'d/m/Y H:i' }}
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <strong>Table</strong><br>
+            {{ commande.table }}
+        </div>
+        <div class="col-md-6 text-md-end">
+            <strong>Caissier</strong><br>
+            {% if commande.caissier %}
+                {{ commande.caissier.username }}
+            {% else %}
+                —
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <strong>Produits commandés</strong>
+        {% for ligne in commande.lignes.all %}
+        <div class="line-item d-flex justify-content-between align-items-center">
+            <div>
+                <div class="fw-semibold">{{ ligne.produit.nom }}</div>
+                <small class="text-muted">{{ ligne.quantite }} x {{ ligne.prix_unitaire }} FC</small>
+            </div>
+            <div class="text-end fw-bold">{{ ligne.sous_total }} FC</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="border-top pt-3">
+        <div class="d-flex justify-content-between mb-2">
+            <span>Sous-total</span>
+            <span>{{ commande.total_montant }} FC</span>
+        </div>
+        <div class="d-flex justify-content-between total-row">
+            <span>Total</span>
+            <span>{{ commande.total_montant }} FC</span>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <button class="btn btn-dark print-btn" onclick="window.print()">Imprimer le reçu</button>
+    </div>
+</div>
+</body>
+</html>

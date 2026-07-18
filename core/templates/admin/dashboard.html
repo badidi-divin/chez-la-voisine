@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin - Chez la voisine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .card-panel { border-radius: 18px; box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06); }
+        .filter-card { border-radius: 16px; }
+        .stat-box { min-height: 140px; }
+        .table-responsive { max-height: 520px; overflow: auto; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark bg-dark sticky-top px-4 py-3">
+    <div class="d-flex align-items-center gap-3">
+        <span class="navbar-brand mb-0 h5 text-white">
+            <i class="fa-solid fa-chart-line me-2 text-warning"></i>Admin - Tableau de bord
+        </span>
+    </div>
+    <div class="ms-auto">
+        <a href="{% url 'deconnexion_portail' %}" class="btn btn-outline-light btn-sm">
+            <i class="fa-solid fa-sign-out-alt"></i>
+        </a>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <div class="mb-4">
+        <h4 class="fw-bold">Bonjour, {{ user.username|capfirst }} !</h4>
+        <p class="text-muted">Statistiques globales des commandes et filtres décisionnels.</p>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card card-panel p-4 stat-box">
+                <div class="text-secondary small">Commandes</div>
+                <div class="fs-3 fw-bold">{{ total_orders }}</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-panel p-4 stat-box">
+                <div class="text-secondary small">Chiffre d'affaires</div>
+                <div class="fs-3 fw-bold">{{ total_revenue }} FC</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-panel p-4 stat-box">
+                <div class="text-secondary small">Statuts</div>
+                {% for entry in status_counts %}
+                <div class="d-flex justify-content-between">
+                    <span>{{ entry.statut }}</span>
+                    <strong>{{ entry.count }}</strong>
+                </div>
+                {% empty %}
+                <p class="text-muted">Aucun résultat.</p>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-panel p-4 stat-box">
+                <div class="text-secondary small">Dernières commandes</div>
+                <div class="fs-3 fw-bold">{{ commandes_globales|length }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-panel mb-4 filter-card p-4">
+        <h5 class="mb-3">Filtres de recherche</h5>
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Date début</label>
+                <input type="date" name="start_date" value="{{ filters.start_date }}" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date fin</label>
+                <input type="date" name="end_date" value="{{ filters.end_date }}" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Statut</label>
+                <select name="statut" class="form-select">
+                    <option value="">Tous</option>
+                    {% for key, label in status_choices %}
+                    <option value="{{ key }}" {% if filters.statut == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Serveur</label>
+                <select name="serveur" class="form-select">
+                    <option value="">Tous</option>
+                    {% for serveur in serveurs %}
+                    <option value="{{ serveur.username }}" {% if filters.serveur == serveur.username %}selected{% endif %}>{{ serveur.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Caissier</label>
+                <select name="caissier" class="form-select">
+                    <option value="">Tous</option>
+                    {% for caissier in caissiers %}
+                    <option value="{{ caissier.username }}" {% if filters.caissier == caissier.username %}selected{% endif %}>{{ caissier.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 text-end">
+                <button class="btn btn-primary">Appliquer</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card card-panel mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-4">Commandes</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Date</th>
+                            <th>Table</th>
+                            <th>Statut</th>
+                            <th>Serveur</th>
+                            <th>Caissier</th>
+                            <th>Traiteur</th>
+                            <th>Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for commande in commandes_globales %}
+                        <tr>
+                            <td>{{ commande.id }}</td>
+                            <td>{{ commande.date_creation|date:'d/m/Y H:i' }}</td>
+                            <td>{{ commande.table }}</td>
+                            <td>{{ commande.get_statut_display }}</td>
+                            <td>{% if commande.serveur %}{{ commande.serveur.username }}{% else %}—{% endif %}</td>
+                            <td>{% if commande.caissier %}{{ commande.caissier.username }}{% else %}—{% endif %}</td>
+                            <td>{% if commande.traiteur %}{{ commande.traiteur.username }}{% else %}—{% endif %}</td>
+                            <td>{{ commande.total_montant }} FC</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">Aucune commande trouvée.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

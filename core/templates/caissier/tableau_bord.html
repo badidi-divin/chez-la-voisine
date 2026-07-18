@@ -160,6 +160,32 @@
     payerButtons.forEach(button => button.addEventListener('click', () => sendPaymentAction(button, 'PAYEE')));
     annulerButtons.forEach(button => button.addEventListener('click', () => sendPaymentAction(button, 'ANNULE')));
 
+    function sendPaymentAction(button, action) {
+        const pk = button.dataset.id;
+        if (!pk) return;
+
+        fetch(`{% url 'valider_paiement_commande' pk=0 %}`.replace('/0/', `/${pk}/`), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ action }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (action === 'PAYEE') {
+                    const receiptUrl = `{% url 'recu_paiement_commande' pk=0 %}`.replace('/0/', `/${pk}/`);
+                    window.open(receiptUrl, '_blank');
+                }
+                window.location.reload();
+            } else {
+                alert(data.error || 'Impossible de mettre à jour la commande.');
+            }
+        });
+    }
+
     function getCookie(name) {
         const value = `; ${document.cookie}`;
         const parts = value.split(`; ${name}=`);
