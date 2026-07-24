@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <!-- EN-TÊTE -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1">
+                <i class="bi bi-cash-coin text-success me-2"></i>Espace Caisse
+            </h3>
+            <p class="text-muted small mb-0">Consultez, filtrez et validez les règlements des commandes clients.</p>
+        </div>
+    </div>
+
+    <!-- BARRE DE FILTRES (SERVEUR & DATE) -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-3">
+            <form method="GET" action="" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="filter_serveur" class="form-label small fw-bold text-muted">Filtrer par Serveur</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-person"></i></span>
+                        <select name="serveur" id="filter_serveur" class="form-select border-start-0">
+                            <option value="">Tous les serveurs</option>
+                            {% for s in serveurs %}
+                            <option value="{{ s.id }}" {% if request.GET.serveur == s.id|stringformat:"s" %}selected{% endif %}>
+                                {{ s.get_full_name|default:s.username }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label for="filter_date" class="form-label small fw-bold text-muted">Filtrer par Date</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar3"></i></span>
+                        <input type="date" name="date" id="filter_date" class="form-control border-start-0" value="{{ request.GET.date }}">
+                    </div>
+                </div>
+
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary fw-bold w-100">
+                        <i class="bi bi-filter me-1"></i> Filtrer
+                    </button>
+                    {% if request.GET.serveur or request.GET.date %}
+                    <a href="{% url 'caissier_dashboard' %}" class="btn btn-outline-secondary" title="Réinitialiser">
+                        <i class="bi bi-x-circle"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- COMMANDES À ENCAISSER -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-hourglass-split text-warning me-2"></i>Commandes en attente de règlement
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3"># ID</th>
+                                    <th>Heure</th>
+                                    <th>Table</th>
+                                    <th>Serveur</th>
+                                    <th>Total</th>
+                                    <th class="text-end pe-3">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for commande in commandes_a_encaisser %}
+                                <tr>
+                                    <td class="ps-3 fw-bold">#{{ commande.id }}</td>
+                                    <td>{{ commande.date_creation|date:"H:i" }}</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-geo-alt text-primary me-1"></i>{{ commande.table }}
+                                        </span>
+                                    </td>
+                                    <td>{{ commande.serveur.get_full_name|default:commande.serveur.username|default:"N/A" }}</td>
+                                    <td class="fw-bold text-success fs-6">
+                                        {{ commande.total_montant|floatformat:0 }} FC
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <button type="button" 
+                                                class="btn btn-success btn-sm fw-bold shadow-sm"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#modalPaiement{{ commande.id }}">
+                                            <i class="bi bi-credit-card me-1"></i> Encaisser
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-5">
+                                        <i class="bi bi-check-all fs-1 text-success d-block mb-2"></i>
+                                        Aucune commande en attente pour ces critères.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DERNIERS RÈGLEMENTS EFFECTUÉS -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-receipt-cutoff text-primary me-2"></i>Derniers encaissements
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for commande in commandes_payees %}
+                        <li class="list-group-item p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div>
+                                    <h6 class="fw-bold mb-0">Commande #{{ commande.id }} - {{ commande.table }}</h6>
+                                    <small class="text-muted">
+                                        Par {{ commande.caissier.username|default:"Caissier" }} à {{ commande.date_modification|date:"H:i" }}
+                                    </small>
+                                </div>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle fs-6">
+                                    {{ commande.total_montant|floatformat:0 }} FC
+                                </span>
+                            </div>
+                            <div class="text-end">
+                                <a href="{% url 'imprimer_recu' commande.id %}" target="_blank" class="btn btn-link btn-sm text-decoration-none p-0">
+                                    <i class="bi bi-printer me-1"></i> Réimprimer reçu
+                                </a>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-center text-muted py-4">
+                            Aucun encaissement trouvé.
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALES DE PAIEMENT -->
+{% for commande in commandes_a_encaisser %}
+<div class="modal fade" id="modalPaiement{{ commande.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold">
+                    Paiement Commande #{{ commande.id }} - {{ commande.table }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <form action="{% url 'valider_paiement' commande.id %}" method="POST">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <!-- Résumé des articles -->
+                    <h6 class="fw-bold mb-2">Détails des consommations :</h6>
+                    <ul class="list-group list-group-flush border-bottom mb-3">
+                        {% for ligne in commande.lignes.all %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span><strong>{{ ligne.quantite }}x</strong> {{ ligne.produit.nom }}</span>
+                            <span class="fw-semibold">{{ ligne.prix_total|floatformat:0 }} FC</span>
+                        </li>
+                        {% empty %}
+                        {% for ligne in commande.lignecommande_set.all %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span><strong>{{ ligne.quantite }}x</strong> {{ ligne.produit.nom }}</span>
+                            <span class="fw-semibold">{{ ligne.prix_total|floatformat:0 }} FC</span>
+                        </li>
+                        {% endfor %}
+                        {% endfor %}
+                    </ul>
+
+                    <!-- Net à payer -->
+                    <div class="p-3 bg-light rounded text-center mb-3">
+                        <small class="text-muted d-block text-uppercase fw-bold">Montant Net à Payer</small>
+                        <span class="fs-2 fw-bold text-success">{{ commande.total_montant|floatformat:0 }} FC</span>
+                    </div>
+
+                    <!-- Calculatrice Monnaie à rendre -->
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label for="recu-{{ commande.id }}" class="form-label small fw-bold">Montant Reçu :</label>
+                            <input type="number" 
+                                   class="form-control form-control-lg" 
+                                   id="recu-{{ commande.id }}" 
+                                   placeholder="ex: 20000"
+                                   oninput="calculerMonnaie({{ commande.id }}, {{ commande.total_montant|stringformat:'f' }})">
+                        </div>
+                        <div class="col-6">
+                            <label for="monnaie-{{ commande.id }}" class="form-label small fw-bold">Monnaie à Rendre :</label>
+                            <input type="text" 
+                                   class="form-control form-control-lg bg-white fw-bold text-danger" 
+                                   id="monnaie-{{ commande.id }}" 
+                                   value="0 FC" 
+                                   readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light d-flex justify-content-between">
+                    <a href="{% url 'imprimer_recu' commande.id %}" target="_blank" class="btn btn-outline-secondary">
+                        <i class="bi bi-printer me-1"></i> Imprimer Proforma / Facture
+                    </a>
+                    <div>
+                        <button type="button" class="btn btn-secondary me-1" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-success fw-bold px-3">
+                            <i class="bi bi-check2-circle me-1"></i> Valider le règlement
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+    function calculerMonnaie(commandeId, total) {
+        const inputRecu = document.getElementById('recu-' + commandeId);
+        const monnaieInput = document.getElementById('monnaie-' + commandeId);
+        
+        const montantRecu = parseFloat(inputRecu.value) || 0;
+        const monnaie = montantRecu - total;
+
+        if (montantRecu === 0) {
+            monnaieInput.value = '0 FC';
+            monnaieInput.classList.remove('text-success');
+            monnaieInput.classList.add('text-danger');
+        } else if (monnaie >= 0) {
+            monnaieInput.value = Math.round(monnaie).toLocaleString('fr-FR') + ' FC';
+            monnaieInput.classList.remove('text-danger');
+            monnaieInput.classList.add('text-success');
+        } else {
+            monnaieInput.value = 'Incomplet';
+            monnaieInput.classList.remove('text-success');
+            monnaieInput.classList.add('text-danger');
+        }
+    }
+</script>
+{% endblock %}

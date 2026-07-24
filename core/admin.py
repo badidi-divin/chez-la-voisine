@@ -1,23 +1,23 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Categorie, Produit, Commande, LigneCommande
+from django.utils.safestring import mark_safe
+from .models import Categorie, Produit, ReservationStock, Commande, LigneCommande
 
 
 # Personnalisation des titres de l'interface d'administration
-admin.site.site_header = "Espace La Voisine Admin"                    # Titre dans la barre supérieure bleue
-admin.site.site_title = "Espace La Voisine Admin"                 # Titre de l'onglet du navigateur
-admin.site.index_title = "Gestion du Restaurant"          # Sous-titre sur la page d'accueil de l'admin
+admin.site.site_header = "Espace La Voisine Admin"
+admin.site.site_title = "Espace La Voisine Admin"
+admin.site.index_title = "Gestion du Restaurant"
 
 
 # Helper de formatage pour les prix en Franc Congolais (FC)
 def formater_fc(valeur):
     if valeur is None:
         return "0 FC"
-    # Formate le nombre avec séparateur de milliers (ex: 15 000 FC)
     return f"{int(valeur):,}".replace(",", " ") + " FC"
 
 
-# --- 1. CONFIGURATION DES PRODUITS ---
+# --- 1. CATÉGORIES ET PRODUITS ---
 
 @admin.register(Categorie)
 class CategorieAdmin(admin.ModelAdmin):
@@ -27,83 +27,95 @@ class CategorieAdmin(admin.ModelAdmin):
 
 @admin.register(Produit)
 class ProduitAdmin(admin.ModelAdmin):
-    # 'prix' reste dans list_editable pour être modifié, mais on affiche 'prix_affiche' pour la lisibilité
-    list_display = ('nom', 'categorie', 'prix_affiche', 'prix', 'stock_actuel', 'statut_stock', 'disponible')
+    list_display = (
+        'nom', 
+        'categorie', 
+        'prix_affiche', 
+        'prix', 
+        'stock_actuel', 
+        'stock_alerte', 
+        'statut_stock', 
+        'disponible'
+    )
     list_filter = ('categorie', 'disponible')
     search_fields = ('nom',)
-    list_editable = ('prix', 'stock_actuel', 'disponible')  # Permet de modifier rapidement depuis la liste
+    list_editable = ('prix', 'stock_actuel', 'disponible')
 
-    # Affichage propre du prix dans la liste
     def prix_affiche(self, obj):
         return formater_fc(obj.prix)
     prix_affiche.short_description = "Prix de vente"
     prix_affiche.admin_order_field = "prix"
 
-    # Indicateur visuel pour le gérant (Aide à la décision)
     def statut_stock(self, obj):
         if obj.stock_actuel == 0:
-            return format_html('<span style="color: red; font-weight: bold;">🔴 Rupture de stock</span>', "")
+            return mark_safe('<span style="color: red; font-weight: bold;">🔴 Rupture</span>')
         elif obj.en_alerte:
-            return format_html('<span style="color: orange; font-weight: bold;">⚠️ Stock Critique ({})</span>', obj.stock_actuel)
-        return format_html('<span style="color: green;">🟢 En Stock</span>', "")
+            return format_html(
+                '<span style="color: orange; font-weight: bold;">⚠️ Critique ({stock})</span>', 
+                stock=obj.stock_actuel
+            )
+        
+        return mark_safe('<span style="color: green;">🟢 Disponible</span>')
     
-    statut_stock.short_description = "État du Stock"
+    statut_stock.short_description = "État Stock"
 
 
-# --- 2. CONFIGURATION DES COMMANDES (EDITION EN CASCADE) ---
+# --- 2. RÉSERVATIONS DE STOCK (PANIERS TEMPORAIRES) ---
+
+@admin.register(ReservationStock)
+class ReservationStockAdmin(admin.ModelAdmin):
+    list_display = ('produit', 'quantite', 'session_key', 'serveur', 'created_at', 'updated_at')
+    list_filter = ('created_at', 'serveur')
+    search_fields = ('session_key', 'produit__nom')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+# --- 3. COMMANDES ET LIGNES DE COMMANDE ---
 
 class LigneCommandeInline(admin.TabularInline):
-    """Permet d'ajouter/modifier des produits directement dans la commande"""
     model = LigneCommande
-    extra = 1 # Nombre de lignes vides affichées par défaut
+    extra = 1
     readonly_fields = ('prix_unitaire_affiche', 'sous_total_affiche')
-    fields = ('produit', 'quantite', 'prix_unitaire_affiche', 'sous_total_affiche')
+    fields = ('produit', 'quantite', 'prix_unitaire', 'prix_unitaire_affiche', 'sous_total_affiche', 'est_pret')
 
-    # Affichage du prix unitaire en FC
     def prix_unitaire_affiche(self, obj):
-        if obj.id:
-            return formater_fc(obj.prix_unitaire)
-        return "-"
-    prix_unitaire_affiche.short_description = "Prix Unitaire"
+        return formater_fc(obj.prix_unitaire) if obj.id else "-"
+    prix_unitaire_affiche.short_description = "Prix Unitaire (FC)"
 
-    # Affichage du sous-total de la ligne en FC
     def sous_total_affiche(self, obj):
-        if obj.id:
-            return formater_fc(obj.sous_total)
-        return "-"
-    sous_total_affiche.short_description = "Sous-total"
+        return formater_fc(obj.sous_total) if obj.id else "-"
+    sous_total_affiche.short_description = "Sous-total (FC)"
 
 
 @admin.register(Commande)
 class CommandeAdmin(admin.ModelAdmin):
-    # Liste globale des commandes pour le gérant et le caissier
-    list_display = ('id', 'table', 'serveur', 'statut_badge', 'total_calcule', 'date_creation', 'caissier')
-    list_filter = ('statut', 'date_creation', 'serveur')
+    list_display = ('id', 'table', 'serveur', 'caissier', 'statut_badge', 'montant_total_display', 'date_creation')
+    list_filter = ('statut', 'date_creation', 'serveur', 'caissier')
     search_fields = ('id', 'table')
-    
-    # Intégration des lignes de commande dans la fiche de commande
     inlines = [LigneCommandeInline]
+    readonly_fields = ('total_montant', 'date_creation', 'date_modification')
 
-    # Badges de couleur pour suivre l'état du workflow en un coup d'œil
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('serveur', 'caissier')
+
     def statut_badge(self, obj):
         colors = {
-            'EN_ATTENTE': '#ffc107',      # Jaune
-            'EN_PREPARATION': '#17a2b8',  # Bleu info
-            'SERVI': '#28a745',           # Vert
-            'PAYE': '#6c757d',            # Gris (clôturé)
-            'ANNULE': '#dc3545',          # Rouge
+            'EN_ATTENTE': '#ffc107',     # Jaune
+            'EN_PREPARATION': '#17a2b8', # Bleu info
+            'PRET': '#fd7e14',           # Orange
+            'PAYEE': '#28a745',          # Vert
+            'ANNULE': '#dc3545',         # Rouge
         }
-        color = colors.get(obj.statut, '#000')
+        color = colors.get(obj.statut, '#6c757d')
         return format_html(
-            '<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-weight: bold;">{}</span>',
-            color,
-            obj.get_statut_display()
+            '<span style="background-color: {color}; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;">{statut}</span>',
+            color=color,
+            statut=obj.get_statut_display()
         )
-    
     statut_badge.short_description = "Statut"
+    statut_badge.admin_order_field = "statut"
 
-    # Affichage du total de la commande globale en FC
-    def total_calcule(self, obj):
-        return formater_fc(obj.total_commande)
-    total_calcule.short_description = "Montant Total"
-    total_calcule.admin_order_field = "total_commande"
+    def montant_total_display(self, obj):
+        return formater_fc(obj.total_montant)
+    montant_total_display.short_description = "Montant Total"
+    montant_total_display.admin_order_field = "total_montant"

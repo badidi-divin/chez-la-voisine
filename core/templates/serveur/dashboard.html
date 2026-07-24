@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- En-tête avec message de bienvenue -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="bi bi-person-badge"></i> Espace Serveur</h2>
+        <p class="text-muted small mb-0">Bienvenue, <strong>{{ request.user.username }}</strong></p>
+    </div>
+   <a href="{% url 'nouvelle_commande' %}" class="btn btn-primary shadow-sm">
+    <i class="bi bi-plus-circle me-1"></i> Nouvelle Commande
+</a>
+</div>
+
+<!-- Cartes de Statistiques -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm bg-primary text-white p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-white-50 small mb-1">Commandes du jour</h6>
+                    <h3 class="fw-bold mb-0">{{ stats.du_jour }}</h3>
+                </div>
+                <i class="bi bi-journal-text fs-1 text-white-50"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm bg-warning text-dark p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-dark-50 small mb-1">En attente / Prêtes</h6>
+                    <h3 class="fw-bold mb-0">{{ stats.en_attente }}</h3>
+                </div>
+                <i class="bi bi-clock-history fs-1 text-dark-50"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm bg-success text-white p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-white-50 small mb-1">Payées / Servies</h6>
+                    <h3 class="fw-bold mb-0">{{ stats.validees }}</h3>
+                </div>
+                <i class="bi bi-check-circle fs-1 text-white-50"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm bg-secondary text-white p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="text-white-50 small mb-1">Total Historique</h6>
+                    <h3 class="fw-bold mb-0">{{ stats.total_commandes }}</h3>
+                </div>
+                <i class="bi bi-archive fs-1 text-white-50"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Barre de Recherche Rapide et Filtres pour le Serveur -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-center">
+            <!-- Filtre Période -->
+            <div class="col-12 col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-calendar-range"></i></span>
+                    <select name="periode" class="form-select form-select-sm border-start-0" onchange="this.form.submit()">
+                        <option value="today" {% if request.GET.periode == 'today' or not request.GET.periode %}selected{% endif %}>Aujourd'hui</option>
+                        <option value="week" {% if request.GET.periode == 'week' %}selected{% endif %}>Cette semaine</option>
+                        <option value="month" {% if request.GET.periode == 'month' %}selected{% endif %}>Ce mois-ci</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Filtre Statut -->
+            <div class="col-12 col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-funnel"></i></span>
+                    <select name="statut" class="form-select form-select-sm border-start-0" onchange="this.form.submit()">
+                        <option value="">Tous les statuts</option>
+                        <option value="EN_ATTENTE" {% if request.GET.statut == 'EN_ATTENTE' %}selected{% endif %}>En attente</option>
+                        <option value="PRET" {% if request.GET.statut == 'PRET' %}selected{% endif %}>Prête</option>
+                        <option value="PAYEE" {% if request.GET.statut == 'PAYEE' %}selected{% endif %}>Payée</option>
+                        <option value="ANNULE" {% if request.GET.statut == 'ANNULE' %}selected{% endif %}>Annulée</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Boutons de réinitialisation -->
+            <div class="col-12 col-md-4 d-flex justify-content-end gap-2">
+                <button type="submit" class="btn btn-sm btn-primary w-100 w-md-auto">
+                    <i class="bi bi-search me-1"></i> Filtrer
+                </button>
+                {% if request.GET.periode or request.GET.statut %}
+                    <a href="{% url 'serveur_dashboard' %}" class="btn btn-sm btn-outline-secondary" title="Réinitialiser">
+                        <i class="bi bi-x-circle"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Dernières commandes du serveur -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-receipt me-2"></i>Mes Commandes Récentes</h5>
+        <a href="{% url 'serveur_historique' %}" class="btn btn-outline-secondary btn-sm">
+            Voir tout l'historique
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#ID</th>
+                        <th>Table</th>
+                        <th>Montant</th>
+                        <th>Statut</th>
+                        <th>Heure</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cmd in commandes_recentes %}
+                    <tr>
+                        <td class="fw-bold">#{{ cmd.id }}</td>
+                        <td><span class="badge bg-light text-dark border">Table {{ cmd.table }}</span></td>
+                        <td class="fw-bold text-primary">{{ cmd.total_montant|floatformat:0 }} FC</td>
+                        <td>
+                            {% if cmd.statut == 'EN_ATTENTE' %}
+                                <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> En attente</span>
+                            {% elif cmd.statut == 'PRET' %}
+                                <span class="badge bg-info text-white"><i class="bi bi-bell"></i> Prête</span>
+                            {% elif cmd.statut == 'PAYEE' %}
+                                <span class="badge bg-success"><i class="bi bi-check-all"></i> Payée</span>
+                            {% elif cmd.statut == 'ANNULE' %}
+                                <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Annulée</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ cmd.statut }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="small text-muted">{{ cmd.date_creation|date:"H:i" }}</td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-outline-primary" title="Détails">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+                            Aucune commande correspondant aux critères.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

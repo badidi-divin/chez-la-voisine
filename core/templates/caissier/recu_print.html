@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Reçu #{{ commande.id }}</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; width: 80mm; margin: 0 auto; padding: 10px; }
+        .text-center { text-align: center; }
+        .line { border-bottom: 1px dashed #000; margin: 8px 0; }
+        table { width: 100%; font-size: 12px; }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="text-center">
+        <h3>TERASSE LA VOISINE</h3>
+        <p>Commande #{{ commande.id }} - Table {{ commande.table }}</p>
+        <p>Date : {{ commande.date_creation|date:"d/m/Y H:i" }}</p>
+        <p>Serveur : {{ commande.serveur.username }}</p>
+    </div>
+
+    <div class="line"></div>
+
+    <table>
+        {% for ligne in commande.lignes.all %}
+        <tr>
+            <td>{{ ligne.quantite }}x {{ ligne.produit.nom }}</td>
+            <td style="text-align: right;">{{ ligne.sous_total|floatformat:0 }} FC</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div class="line"></div>
+
+    <h3 style="display:flex; justify-content:space-between;">
+        <span>TOTAL :</span>
+        <span>{{ commande.total_montant|floatformat:0 }} FC</span>
+    </h3>
+
+    <div class="text-center" style="margin-top:20px;">
+        <p>Merci pour votre visite !</p>
+    </div>
+</body>
+</html>

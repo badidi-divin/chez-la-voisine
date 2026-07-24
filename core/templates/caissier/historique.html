@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- EN-TÊTE -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1">
+                <i class="bi bi-clock-history text-primary me-2"></i>Historique des Encaissements
+            </h3>
+            <p class="text-muted small mb-0">Consultez et recherchez l'ensemble des transactions validées en caisse.</p>
+        </div>
+        <a href="{% url 'caissier_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Retour à la caisse
+        </a>
+    </div>
+
+    <!-- BARRE DE RECHERCHE ET FILTRES -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-3">
+            <form method="GET" action="" class="row g-3 align-items-center">
+                <!-- Recherche texte -->
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" 
+                               name="q" 
+                               class="form-control border-start-0" 
+                               placeholder="Rechercher par N° de commande ou Table..." 
+                               value="{{ request.GET.q }}">
+                    </div>
+                </div>
+
+                <!-- Filtre par Période -->
+                <div class="col-md-4">
+                    <select name="periode" class="form-select" onchange="this.form.submit()">
+                        <option value="" {% if not request.GET.periode %}selected{% endif %}>Toutes les périodes</option>
+                        <option value="today" {% if request.GET.periode == 'today' %}selected{% endif %}>Aujourd'hui</option>
+                        <option value="month" {% if request.GET.periode == 'month' %}selected{% endif %}>Ce mois-ci</option>
+                    </select>
+                </div>
+
+                <!-- Boutons d'action -->
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary fw-bold w-100">
+                        <i class="bi bi-filter me-1"></i> Filtrer
+                    </button>
+                    {% if request.GET.q or request.GET.periode %}
+                    <a href="{% url 'caissier_historique' %}" class="btn btn-outline-secondary" title="Réinitialiser">
+                        <i class="bi bi-x-circle"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TABLEAU DE L'HISTORIQUE -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3"># ID</th>
+                            <th>Date & Heure</th>
+                            <th>Table</th>
+                            <th>Serveur</th>
+                            <th>Caissier</th>
+                            <th class="text-end">Montant Total</th>
+                            <th class="text-center">Statut</th>
+                            <th class="text-end pe-3">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for commande in commandes %}
+                        <tr>
+                            <td class="ps-3 fw-bold">#{{ commande.id }}</td>
+                            <td>
+                                <div>{{ commande.date_modification|date:"d/m/Y H:i" }}</div>
+                                <small class="text-muted">Créée à {{ commande.date_creation|date:"H:i" }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border">
+                                    <i class="bi bi-geo-alt text-primary me-1"></i>{{ commande.table }}
+                                </span>
+                            </td>
+                            <td>{{ commande.serveur.get_full_name|default:commande.serveur.username|default:"N/A" }}</td>
+                            <td>
+                                <small class="fw-semibold text-secondary">
+                                    <i class="bi bi-person-check me-1"></i>{{ commande.caissier.username|default:"Caissier" }}
+                                </small>
+                            </td>
+                            <td class="text-end fw-bold text-success fs-6">
+                                {{ commande.total_montant|floatformat:0 }} FC
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                    <i class="bi bi-check-circle me-1"></i> Payée
+                                </span>
+                            </td>
+                            <td class="text-end pe-3">
+                                <a href="{% url 'imprimer_recu' commande.id %}" target="_blank" class="btn btn-outline-secondary btn-sm fw-semibold shadow-sm">
+                                    <i class="bi bi-printer me-1"></i> Reçu
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-5">
+                                <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+                                Aucun historique d'encaissement trouvé pour ces critères.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- FOOTER / TOTAL -->
+        {% if commandes %}
+        <div class="card-footer bg-light py-3 d-flex justify-content-between align-items-center">
+            <span class="text-muted small">
+                Affichage de <strong>{{ commandes|length }}</strong> transaction(s)
+            </span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

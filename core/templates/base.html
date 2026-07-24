@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}La Voisine{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="{% url 'redirect_dashboard' %}">Chez La Voisine</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto">
+        {% if request.user.is_superuser %}
+            <!-- Menu Admin -->
+            <li class="nav-item"><a class="nav-link" href="{% url 'admin_dashboard' %}">Dashboard BI</a></li>
+            <li class="nav-item"><a class="nav-link" href="/admin/">Administration Django</a></li>
+        {% elif "Serveur" in request.user.groups.all.0.name %}
+            <!-- Menu Serveur -->
+            <li class="nav-item"><a class="nav-link" href="{% url 'serveur_dashboard' %}">Accueil</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'serveur_historique' %}">Mes Commandes</a></li>
+        {% elif "Caissier" in request.user.groups.all.0.name %}
+            <!-- Menu Caissier -->
+            <li class="nav-item"><a class="nav-link" href="{% url 'caissier_dashboard' %}">Caisse</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'caissier_historique' %}">Historique Encaissements</a></li>
+        {% endif %}
+      </ul>
+
+      <div class="d-flex align-items-center text-white me-3">
+        <i class="bi bi-person-circle me-2"></i> {{ request.user.username|capfirst }}
+      </div>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button class="btn btn-outline-light btn-sm" type="submit">Déconnexion</button>
+      </form>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-graph-up-arrow"></i> Tableau de bord décisionnel</h2>
+    
+    <!-- Raccourcis de période rapides -->
+    <div class="btn-group" role="group">
+        <a href="?periode=today" class="btn btn-outline-secondary btn-sm {% if request.GET.periode == 'today' %}active{% endif %}">Aujourd'hui</a>
+        <a href="?periode=7days" class="btn btn-outline-secondary btn-sm {% if request.GET.periode == '7days' or not request.GET.periode %}active{% endif %}">7 Derniers jours</a>
+        <a href="?periode=month" class="btn btn-outline-secondary btn-sm {% if request.GET.periode == 'month' %}active{% endif %}">Ce mois</a>
+    </div>
+</div>
+
+<!-- Formulaire de Filtres Personnalisés -->
+<div class="card p-3 shadow-sm mb-4 bg-light">
+    <form method="GET" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label for="date_debut" class="form-label small fw-bold">Date Début</label>
+            <input type="date" class="form-control form-control-sm" id="date_debut" name="date_debut" value="{{ filters.date_debut }}">
+        </div>
+        <div class="col-md-3">
+            <label for="date_fin" class="form-label small fw-bold">Date Fin</label>
+            <input type="date" class="form-control form-control-sm" id="date_fin" name="date_fin" value="{{ filters.date_fin }}">
+        </div>
+        <div class="col-md-3">
+            <label for="serveur" class="form-label small fw-bold">Serveur</label>
+            <select class="form-select form-select-sm" id="serveur" name="serveur">
+                <option value="">Tous les serveurs</option>
+                {% for s in list_serveurs %}
+                    <option value="{{ s.id }}" {% if filters.serveur == s.id|stringformat:"s" %}selected{% endif %}>{{ s.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-filter"></i> Filtrer
+            </button>
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser">
+                <i class="bi bi-arrow-clockwise"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Cartes KPI -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white p-3 shadow-sm">
+            <h6>CA de la Période</h6>
+            <h3 class="fw-bold">{{ kpis.ca_periode|floatformat:0 }} FC</h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white p-3 shadow-sm">
+            <h6>CA du Mois (Global)</h6>
+            <h3 class="fw-bold">{{ kpis.ca_mois|floatformat:0 }} FC</h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark p-3 shadow-sm">
+            <h6>Commandes en attente</h6>
+            <h3 class="fw-bold">{{ kpis.en_attente }}</h3>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white p-3 shadow-sm">
+            <h6>Effectif (Serveurs / Caissiers)</h6>
+            <h3 class="fw-bold">{{ kpis.nb_serveurs }} / {{ kpis.nb_caissiers }}</h3>
+        </div>
+    </div>
+</div>
+
+<!-- Graphique & Tops -->
+<div class="row g-4">
+    <div class="col-md-8">
+        <div class="card p-3 shadow-sm">
+            <h5>Évolution des ventes</h5>
+            <canvas id="salesChart"></canvas>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3 shadow-sm mb-3">
+            <h5>Top 5 Produits Vendus</h5>
+            <ul class="list-group list-group-flush">
+                {% for item in top_produits %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ item.produit__nom }}
+                        <span class="badge bg-primary rounded-pill">{{ item.total_vendu }}</span>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item text-muted text-center">Aucune vente enregistrée</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const ctx = document.getElementById('salesChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [{
+                label: 'Chiffre d\'Affaires (FC)',
+                data: {{ chart_data|safe }},
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+</script>
+{% endblock %}

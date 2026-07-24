@@ -11,6 +11,9 @@ import dj_database_url
 # Chemin principal du projet
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Détecte si le projet s'exécute sur Render
+ON_RENDER = 'RENDER' in os.environ
+
 
 # =====================================================
 # SECURITY SETTINGS
@@ -18,11 +21,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-bg*mq+qa*+_7qe3c!fvjly4&++ns+=02_4#9i$#3amn!=-j%tz')
 
-# Passe automatiquement à False en production sur Render si la variable n'est pas définie à True
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+# DEBUG est True en local, mais prend la valeur de la variable d'environnement sur Render (False par défaut)
+DEBUG = os.environ.get('DEBUG', 'True' if not ON_RENDER else 'False') == 'True'
 
-# Récupère l'étoile (*) configurée sur Render ou accepte le local par défaut
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()
+# Autorise localhost / 127.0.0.1 en local + l'hôte automatique attribué par Render en production
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# Autorisations CSRF indispensables pour Render
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.onrender.com',
+]
+if RENDER_EXTERNAL_HOSTNAME:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
 
 
 # =====================================================
@@ -52,7 +65,6 @@ MIDDLEWARE = [
 
     # Gestion des fichiers statiques en production (WhiteNoise)
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    
 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -80,8 +92,8 @@ WSGI_APPLICATION = 'restofast_project.wsgi.application'
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'BACKEND': 'django.template.backends.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'], # Permet d'inclure un dossier templates racine si besoin
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -95,19 +107,33 @@ TEMPLATES = [
 
 
 # =====================================================
-# DATABASE CONFIGURATION (LOCAL & PRODUCTION)
+# DATABASE CONFIGURATION (HYBRIDE LOCAL / RENDER)
 # =====================================================
 
-# dj-database-url va lire automatiquement la variable DATABASE_URL de Render.
-# Si elle n'existe pas (en local), il se rabattra sur votre PostgreSQL local.
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get(
-            'DATABASE_URL',
-            'postgres://postgres:0000@localhost:5432/universite_db'
+# 1. Si la variable DATABASE_URL existe (Render), on utilise PostgreSQL sur Render
+# 2. Sinon (Local), on se connecte à la base PostgreSQL locale
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=True
         )
-    )
-}
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'universite_db',
+            'USER': 'postgres',
+            'PASSWORD': '0000',
+            'HOST': 'localhost',
+            'PORT': '5432',
+        }
+    }
 
 
 # =====================================================
@@ -121,9 +147,9 @@ AUTH_PASSWORD_VALIDATORS = []
 # INTERNATIONALISATION
 # =====================================================
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'fr-fr'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Kinshasa'
 
 USE_I18N = True
 
@@ -134,23 +160,33 @@ USE_TZ = True
 # STATIC FILES
 # =====================================================
 
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Désactive la compression stricte de WhiteNoise en local pour éviter les erreurs de serveur de dev
+if ON_RENDER:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+
 
 # =====================================================
 # AUTHENTIFICATION
 # =====================================================
 
-LOGIN_URL = 'connexion_unique'
-
-LOGIN_REDIRECT_URL = 'connexion_unique'
-
-LOGOUT_REDIRECT_URL = 'connexion_unique'
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'redirect_dashboard'

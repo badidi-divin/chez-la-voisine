@@ -1,0 +1,314 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- COLONNE GAUCHE : Sélecteur, Recherche & Stock Produits -->
+    <div class="col-lg-7 col-md-6">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">
+                        <i class="bi bi-cup-straw text-primary"></i> Sélectionner les Articles
+                    </h5>
+                    <span class="badge bg-light text-dark border" id="compteur-produits">
+                        {{ produits|length }} produit(s)
+                    </span>
+                </div>
+
+                <!-- Barre de Recherche -->
+                <div class="row g-2 mb-3">
+                    <div class="col-12">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0 text-muted">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" 
+                                   id="search-input" 
+                                   class="form-control border-start-0 ps-0" 
+                                   placeholder="Rechercher une boisson, un plat..." 
+                                   onkeyup="filtrerProduits()">
+                            <button class="btn btn-outline-secondary" type="button" onclick="effacerRecherche()">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grille des Produits -->
+                <div class="row row-cols-2 row-cols-md-3 g-2" id="grille-produits" style="max-height: 520px; overflow-y: auto;">
+                    {% for p in produits %}
+                    <div class="col carte-produit-item" data-nom="{{ p.nom|lower }}">
+                        <button type="button" 
+                                id="btn-produit-{{ p.id }}"
+                                data-id="{{ p.id }}"
+                                data-nom="{{ p.nom|escapejs }}"
+                                data-prix="{{ p.prix }}"
+                                data-stock="{{ p.stock_actuel }}"
+                                class="btn btn-outline-dark w-100 h-100 p-3 text-start btn-produit shadow-sm position-relative d-flex flex-column justify-content-between"
+                                {% if p.stock_actuel <= 0 %}disabled{% endif %}
+                                onclick="clicProduit(this)">
+                            
+                            <div style="pointer-events: none;">
+                                <div class="fw-bold text-truncate text-wrap mb-1" style="max-height: 2.8em; overflow: hidden;">
+                                    {{ p.nom }}
+                                </div>
+                                <div class="text-primary fw-semibold small mb-2">
+                                    {{ p.prix|floatformat:0 }} FC
+                                </div>
+                            </div>
+
+                            <!-- Badge Stock Disponible -->
+                            <div class="mt-auto" style="pointer-events: none;">
+                                <span class="badge {% if p.stock_actuel > 5 %}bg-success-subtle text-success border border-success-subtle{% elif p.stock_actuel > 0 %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %} w-100 py-1" 
+                                      id="stock-badge-{{ p.id }}">
+                                    {% if p.stock_actuel > 0 %}
+                                        Dispo: <span id="stock-val-{{ p.id }}">{{ p.stock_actuel }}</span>
+                                    {% else %}
+                                        Rupture de stock
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </button>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-muted py-4 text-center">
+                        Aucun produit disponible.
+                    </div>
+                    {% endfor %}
+
+                    <div class="col-12 text-muted py-4 text-center d-none" id="no-search-results">
+                        <i class="bi bi-search fs-3 d-block mb-2 text-secondary"></i>
+                        Aucun article ne correspond à votre recherche.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- COLONNE DROITE : Panier & Validation -->
+    <div class="col-lg-5 col-md-6">
+        <form method="post" id="form-commande">
+            {% csrf_token %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-cart3"></i> Commande en cours</h5>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Numéro de Table -->
+                    <div class="mb-3">
+                        <label for="table" class="form-label fw-bold text-secondary">Numéro de la Table *</label>
+                        <input type="text" name="table" id="table" class="form-control form-control-lg" placeholder="Ex: Table 04 ou VIP 1" required>
+                    </div>
+
+                    <!-- Liste des articles ajoutés -->
+                    <div class="table-responsive mb-3" style="max-height: 280px; overflow-y: auto;">
+                        <table class="table align-middle mb-0" id="table-panier">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Article</th>
+                                    <th style="width: 110px;">Qte</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="panier-body">
+                                <tr id="empty-panier-msg">
+                                    <td colspan="4" class="text-center text-muted py-4">
+                                        Cliquez sur un article à gauche pour l'ajouter.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Total Général -->
+                    <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded mb-3">
+                        <span class="fs-5 fw-bold text-secondary">Total à payer :</span>
+                        <span class="fs-4 fw-bold text-success" id="total-affichage">0 FC</span>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg shadow-sm" id="btn-valider" disabled>
+                            <i class="bi bi-check-lg me-1"></i> Valider la Commande
+                        </button>
+                        <a href="{% url 'serveur_dashboard' %}" class="btn btn-outline-danger">
+                            Annuler
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Stockage en mémoire du panier
+    let panier = {};
+
+    // 1. Gestion du clic produit
+    function clicProduit(btnElement) {
+        const id = btnElement.getAttribute('data-id');
+        const nom = btnElement.getAttribute('data-nom');
+        const prix = parseFloat(btnElement.getAttribute('data-prix'));
+        const stockInitial = parseInt(btnElement.getAttribute('data-stock'));
+
+        if (isNaN(stockInitial) || stockInitial <= 0) return;
+
+        let qteActuelle = panier[id] ? panier[id].quantite : 0;
+
+        if (qteActuelle < stockInitial) {
+            if (panier[id]) {
+                panier[id].quantite += 1;
+            } else {
+                panier[id] = {
+                    nom: nom,
+                    prix: prix,
+                    quantite: 1,
+                    stockInitial: stockInitial
+                };
+            }
+            rafraichirPanier();
+            mettreAJourStockProduit(id);
+        }
+    }
+
+    // 2. Modification de la quantité (+ / -) dans le panier
+    function modifierQuantite(id, delta) {
+        if (!panier[id]) return;
+
+        let nouvelleQte = panier[id].quantite + delta;
+
+        if (delta > 0 && nouvelleQte > panier[id].stockInitial) {
+            return;
+        }
+
+        if (nouvelleQte <= 0) {
+            delete panier[id];
+        } else {
+            panier[id].quantite = nouvelleQte;
+        }
+
+        rafraichirPanier();
+        mettreAJourStockProduit(id);
+    }
+
+    // 3. Suppression directe
+    function supprimerDuPanier(id) {
+        if (panier[id]) {
+            delete panier[id];
+            rafraichirPanier();
+            mettreAJourStockProduit(id);
+        }
+    }
+
+    // 4. Mise à jour de l'affichage du stock sur le bouton
+    function mettreAJourStockProduit(id) {
+        const btn = document.getElementById(`btn-produit-${id}`);
+        const badge = document.getElementById(`stock-badge-${id}`);
+        if (!btn || !badge) return;
+
+        const stockInitial = parseInt(btn.getAttribute('data-stock'));
+        const qtePanier = panier[id] ? panier[id].quantite : 0;
+        const stockRestant = stockInitial - qtePanier;
+
+        if (stockRestant <= 0) {
+            btn.disabled = true;
+            badge.className = "badge bg-danger-subtle text-danger border border-danger-subtle w-100 py-1";
+            badge.innerHTML = "Rupture de stock";
+        } else {
+            btn.disabled = false;
+            if (stockRestant > 5) {
+                badge.className = "badge bg-success-subtle text-success border border-success-subtle w-100 py-1";
+            } else {
+                badge.className = "badge bg-warning-subtle text-warning-emphasis border border-warning-subtle w-100 py-1";
+            }
+            badge.innerHTML = `Dispo: <span id="stock-val-${id}">${stockRestant}</span>`;
+        }
+    }
+
+    // 5. Rendu du tableau du panier
+    function rafraichirPanier() {
+        const tbody = document.getElementById('panier-body');
+        tbody.innerHTML = '';
+
+        let ids = Object.keys(panier);
+        let grandTotal = 0;
+
+        if (ids.length === 0) {
+            tbody.innerHTML = `
+                <tr id="empty-panier-msg">
+                    <td colspan="4" class="text-center text-muted py-4">
+                        Cliquez sur un article à gauche pour l'ajouter.
+                    </td>
+                </tr>`;
+            document.getElementById('btn-valider').disabled = true;
+        } else {
+            ids.forEach(id => {
+                let item = panier[id];
+                let lineTotal = item.prix * item.quantite;
+                grandTotal += lineTotal;
+
+                let plusDisabled = item.quantite >= item.stockInitial ? 'disabled' : '';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold text-truncate" style="max-width: 120px;">
+                            ${item.nom}
+                            <input type="hidden" name="produits[]" value="${id}">
+                            <input type="hidden" name="quantites[]" value="${item.quantite}">
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary" onclick="modifierQuantite('${id}', -1)">-</button>
+                                <span class="btn btn-light px-2 fw-bold" style="pointer-events:none;">${item.quantite}</span>
+                                <button type="button" class="btn btn-outline-secondary" ${plusDisabled} onclick="modifierQuantite('${id}', 1)">+</button>
+                            </div>
+                        </td>
+                        <td class="fw-bold">${lineTotal.toLocaleString()} FC</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="supprimerDuPanier('${id}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>`;
+            });
+            document.getElementById('btn-valider').disabled = false;
+        }
+
+        document.getElementById('total-affichage').innerText = grandTotal.toLocaleString() + ' FC';
+    }
+
+    // 6. Recherche instantanée
+    function filtrerProduits() {
+        const query = document.getElementById('search-input').value.toLowerCase().trim();
+        const cartes = document.querySelectorAll('.carte-produit-item');
+        let visibles = 0;
+
+        cartes.forEach(carte => {
+            const nomProduit = carte.getAttribute('data-nom');
+            if (nomProduit.includes(query)) {
+                carte.classList.remove('d-none');
+                visibles++;
+            } else {
+                carte.classList.add('d-none');
+            }
+        });
+
+        const noResults = document.getElementById('no-search-results');
+        if (visibles === 0 && cartes.length > 0) {
+            noResults.classList.remove('d-none');
+        } else {
+            noResults.classList.add('d-none');
+        }
+
+        document.getElementById('compteur-produits').innerText = `${visibles} produit(s)`;
+    }
+
+    function effacerRecherche() {
+        document.getElementById('search-input').value = '';
+        filtrerProduits();
+    }
+</script>
+{% endblock %}
